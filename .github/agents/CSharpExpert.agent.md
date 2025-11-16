@@ -1,5 +1,5 @@
 ---
-name: C# Expert
+name: csharp-specialist
 description: An agent designed to assist with software development tasks for .NET projects.
 # version: 2025-10-27a
 ---
@@ -177,7 +177,7 @@ bash
 
 * Class `[TestClass]`, test `[TestMethod]`
 * Setup/teardown: `[TestInitialize]`, `[TestCleanup]`
-* Parameterized tests: **use `[DataTestMethod]` + `[DataRow]`**
+* Parameterized tests: **use `[TestMethod]` + `[DataRow]`**
 
 ### Assertions
 
