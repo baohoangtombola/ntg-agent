@@ -79,13 +79,19 @@ builder.Services.AddScoped<IKnowledgeService, KernelMemoryKnowledge>();
 builder.Services.AddScoped<IKernelMemory>(serviceProvider =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    var timeoutInSeconds = configuration.GetValue<int?>("KernelMemory:HttpClientTimeoutInSeconds") ?? 120;
     var endpoint = Environment.GetEnvironmentVariable($"services__ntg-agent-knowledge__https__0") 
                    ?? Environment.GetEnvironmentVariable($"services__ntg-agent-knowledge__http__0") 
                    ?? throw new InvalidOperationException("KernelMemory Endpoint configuration is required");
     var apiKey = configuration["KernelMemory:ApiKey"] 
                 ?? throw new InvalidOperationException("KernelMemory:ApiKey configuration is required");
 
-    return new MemoryWebClient(endpoint, apiKey);
+    var httpClient = new HttpClient()
+    {
+        Timeout = TimeSpan.FromSeconds(timeoutInSeconds)
+    };
+
+    return new MemoryWebClient(endpoint, httpClient, apiKey);
 });
 
 builder.Services.AddAuthentication("Identity.Application")
