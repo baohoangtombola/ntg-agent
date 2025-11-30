@@ -53,4 +53,30 @@ public class AgentClient(HttpClient httpClient)
         var result = await response.Content.ReadFromJsonAsync<IList<AgentToolDto>>();
         return result ?? [];
     }
+
+    public async Task<Guid> CreateAgent(AgentDetail agentDetail)
+    {
+        var response = await httpClient.PostAsJsonAsync($"api/agentadmin", agentDetail);
+        response.EnsureSuccessStatusCode();
+        
+        var createdAgentId = await response.Content.ReadFromJsonAsync<Guid>();
+        return createdAgentId;
+    }
+
+    public async Task DeleteAgent(Guid id)
+    {
+        var response = await httpClient.DeleteAsync($"api/agentadmin/{id}");
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Status: {(int)response.StatusCode}, Error: {errorContent}");
+        }
+    }
+
+    public async Task UpdateAgentPublishStatus(Guid id, bool isPublished)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"api/agentadmin/{id}/publish", isPublished);
+        response.EnsureSuccessStatusCode();
+    }
 }

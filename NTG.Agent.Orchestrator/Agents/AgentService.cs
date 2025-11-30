@@ -1,4 +1,5 @@
 ﻿using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using NTG.Agent.Common.Dtos.Chats;
@@ -19,7 +20,6 @@ public class AgentService
     private readonly AgentDbContext _agentDbContext;
     private readonly IKnowledgeService _knowledgeService;
     private const int MAX_LATEST_MESSAGE_TO_KEEP_FULL = 5;
-    private Guid agentId = new Guid("31CF1546-E9C9-4D95-A8E5-3C7C7570FEC5"); // We will support multiple agents later
 
     public AgentService(
         IAgentFactory agentFactory,
@@ -148,7 +148,52 @@ public class AgentService
         List<string> tags,
         List<string> ocrDocuments)
     {
-        var agent = await _agentFactory.CreateAgent(agentId);
+        if (promptRequest.AgentId == new Guid("3022DA07-568E-4561-B41C-FAE8102CF4C4"))
+        {
+            await foreach(var response in TestOrchestratorInvokePromptStreamingInternalAsync(promptRequest, history, tags))
+            {
+                yield return response;
+            }
+        }
+        else
+        {
+            var agent = await _agentFactory.CreateAgent(promptRequest.AgentId);
+
+            var chatHistory = new List<ChatMessage>();
+            foreach (var msg in history.OrderBy(m => m.CreatedAt))
+            {
+                chatHistory.Add(new ChatMessage(msg.Role, msg.Content));
+            }
+
+            var prompt = BuildPromptAsync(promptRequest, ocrDocuments);
+
+            var userMessage = BuildUserMessage(promptRequest, prompt);
+
+            chatHistory.Add(userMessage);
+
+            AITool memorySearch = new KnowledgePlugin(_knowledgeService, tags, promptRequest.AgentId).AsAITool();
+
+            var chatOptions = new ChatOptions
+            {
+                Tools = [memorySearch]
+            };
+
+            await foreach (var item in agent.RunStreamingAsync(chatHistory, options: new ChatClientAgentRunOptions(chatOptions)))
+                yield return item.Text;
+        }
+    }
+
+    private async IAsyncEnumerable<string> TestOrchestratorInvokePromptStreamingInternalAsync(
+        PromptRequestForm promptRequest,
+        List<PChatMessage> history,
+        List<string> tags)
+    {
+        var triageAgent = await _agentFactory.CreateAgent(promptRequest.AgentId);
+        var csharpAgent = await _agentFactory.CreateAgent(new Guid("684604F0-3362-4499-A9B9-24AF973DCEBA")); // Gemini Agent ID
+        var javaAgent = await _agentFactory.CreateAgent(new Guid("25ACDA2A-413F-49B6-BBE3-CE1435885F3F")); // Azure OpenAI Agent ID
+        var workflow = AgentWorkflowBuilder.CreateHandoffBuilderWith(triageAgent)
+            .WithHandoffs(triageAgent, [csharpAgent, javaAgent])
+            .Build();
 
         var chatHistory = new List<ChatMessage>();
         foreach (var msg in history.OrderBy(m => m.CreatedAt))
@@ -156,21 +201,20 @@ public class AgentService
             chatHistory.Add(new ChatMessage(msg.Role, msg.Content));
         }
 
-        var prompt = BuildPromptAsync(promptRequest, ocrDocuments);
+        var prompt = BuildPromptAsync(promptRequest, []);
 
         var userMessage = BuildUserMessage(promptRequest, prompt);
 
         chatHistory.Add(userMessage);
-
-        AITool memorySearch = new KnowledgePlugin(_knowledgeService, tags).AsAITool();
-
-        var chatOptions = new ChatOptions
+        StreamingRun run = await InProcessExecution.StreamAsync(workflow, chatHistory);
+        await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
+        await foreach (WorkflowEvent evt in run.WatchStreamAsync().ConfigureAwait(false))
         {
-            Tools = [memorySearch]
-        };
-
-        await foreach (var item in agent.RunStreamingAsync(chatHistory, options: new ChatClientAgentRunOptions(chatOptions)))
-            yield return item.Text;
+            if (evt is AgentRunUpdateEvent e)
+            {
+               yield return e.Data?.ToString() ?? string.Empty;
+            }
+        }
     }
 
     private static ChatMessage BuildUserMessage(PromptRequestForm promptRequest, string prompt)
@@ -215,9 +259,9 @@ public class AgentService
 
     private static string BuildTextOnlyPrompt(string userPrompt) =>
         $@"
-            Question: {userPrompt}. Context: {{memory.search}} then {{search_online}}
-            Given the context and provided history information, tools definitions and prior knowledge, reply to the user question.
-            If the answer is not in the context, inform the user that you can't answer the question.
+            Question: {userPrompt}. Context: Use search knowledge base tool if available.
+            Given the context and provided history information, tools definitions and prior knowledge, reply to the user question. Include citations to the context where appropriate.
+            If the answer is not in the context, try to use the search online tool if available or inform the user that you can't answer the question.
         ";
 
 

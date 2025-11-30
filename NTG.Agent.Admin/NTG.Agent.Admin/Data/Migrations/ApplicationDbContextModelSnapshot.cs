@@ -17,7 +17,7 @@ namespace NTG.Agent.Admin.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.7")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -52,13 +52,14 @@ namespace NTG.Agent.Admin.Migrations
                         new
                         {
                             Id = "d5147680-87f5-41dc-aff2-e041959c2fa1",
+                            ConcurrencyStamp = "c3a91a6b-a975-4542-af12-321515222481",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
-                        });
-                    b.HasData(
+                        },
                         new
                         {
                             Id = "3dc04c42-9b42-4920-b7f2-29dfc2c5d169",
+                            ConcurrencyStamp = "94602b5b-18d2-4043-9761-c64818c856cd",
                             Name = "Anonymous",
                             NormalizedName = "ANONYMOUS"
                         });

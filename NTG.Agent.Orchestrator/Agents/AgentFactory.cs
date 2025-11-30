@@ -26,11 +26,12 @@ public class AgentFactory : IAgentFactory
 
     public async Task<AIAgent> CreateAgent(Guid agentId)
     {
-        var agentConfig = await _agentDbContext.Agents.FirstOrDefaultAsync(a => a.Id == agentId) ?? throw new ArgumentException($"Agent with ID '{agentId}' not found.");
+        var agentConfig = await _agentDbContext.Agents.FirstOrDefaultAsync(a => a.Id == agentId && a.IsPublished) ?? throw new ArgumentException($"Agent with ID '{agentId}' not found.");
         string agentProvider = agentConfig.ProviderName;
         return agentProvider switch
         {
             "GitHubModel" => await CreateOpenAIAgentAsync(agentConfig),
+            "GoogleGemini" => await CreateOpenAIAgentAsync(agentConfig),
             "AzureOpenAI" => await CreateAzureOpenAIAgentAsync(agentConfig),
             _ => throw new NotSupportedException($"Agent provider '{agentProvider}' is not supported."),
         };
@@ -46,6 +47,7 @@ public class AgentFactory : IAgentFactory
         return agentProvider switch
         {
             "GitHubModel" => CreateBasicOpenAIAgent(agentConfig, instructions),
+            "GoogleGemini" => CreateBasicOpenAIAgent(agentConfig, instructions),
             "AzureOpenAI" => CreateBasicAzureOpenAIAgent(agentConfig, instructions),
             _ => throw new NotSupportedException($"Agent provider '{agentProvider}' is not supported."),
         };
@@ -90,7 +92,7 @@ public class AgentFactory : IAgentFactory
 
         var tools = await GetAgentToolsByAgentId(agent);
 
-        return Create(chatClient, instructions: agent.Instructions, name: "NTG.Agent", tools: tools);
+        return Create(chatClient, instructions: agent.Instructions, name: agent.Name, description: agent.Description, tools: tools);
     }
 
     private async Task<AIAgent> CreateAzureOpenAIAgentAsync(Models.Agents.Agent agent)
@@ -107,7 +109,7 @@ public class AgentFactory : IAgentFactory
 
         var tools = await GetAgentToolsByAgentId(agent);
 
-        return Create(chatClient, instructions: agent.Instructions, name: "NTG.Agent", tools: tools);
+        return Create(chatClient, instructions: agent.Instructions, name: agent.Name, description: agent.Description, tools: tools);
     }
 
     private async Task<List<AITool>> GetAgentToolsByAgentId(Models.Agents.Agent agent)
@@ -155,11 +157,12 @@ public class AgentFactory : IAgentFactory
     }
 
 
-    private static AIAgent Create(IChatClient chatClient, string instructions, string name, List<AITool> tools)
+    private static AIAgent Create(IChatClient chatClient, string instructions, string name, string? description, List<AITool> tools)
     {
         var agent = new ChatClientAgent(chatClient,
             name: name,
             instructions: instructions,
+            description: description,
             tools: tools)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "NTG.Agent.Orchestrator")

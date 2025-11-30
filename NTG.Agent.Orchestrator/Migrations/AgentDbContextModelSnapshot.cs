@@ -17,7 +17,7 @@ namespace NTG.Agent.Orchestrator.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.9")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -31,9 +31,18 @@ namespace NTG.Agent.Orchestrator.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Instructions")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
 
                     b.Property<string>("McpServer")
                         .HasColumnType("nvarchar(max)");
@@ -81,6 +90,8 @@ namespace NTG.Agent.Orchestrator.Migrations
                             Id = new Guid("31cf1546-e9c9-4d95-a8e5-3c7c7570fec5"),
                             CreatedAt = new DateTime(2025, 6, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Instructions = "You are a helpful assistant. Answer questions to the best of your ability.",
+                            IsDefault = true,
+                            IsPublished = true,
                             McpServer = "",
                             Name = "Default Agent",
                             OwnerUserId = new Guid("e0afe23f-b53c-4ad8-b718-cb4ff5bb9f71"),
@@ -529,6 +540,43 @@ namespace NTG.Agent.Orchestrator.Migrations
                             RoleId = new Guid("3dc04c42-9b42-4920-b7f2-29dfc2c5d169"),
                             TagId = new Guid("10dd4508-4e35-4c63-bd74-5d90246c7770"),
                             UpdatedAt = new DateTime(2025, 6, 24, 0, 0, 0, 0, DateTimeKind.Unspecified)
+                        });
+                });
+
+            modelBuilder.Entity("NTG.Agent.Orchestrator.Models.UserPreferences.UserPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SelectedAgentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId")
+                        .IsUnique()
+                        .HasFilter("[SessionId] IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasFilter("[UserId] IS NOT NULL");
+
+                    b.ToTable("UserPreferences", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserPreference_UserIdOrSessionId", "([UserId] IS NOT NULL AND [SessionId] IS NULL) OR ([UserId] IS NULL AND [SessionId] IS NOT NULL)");
                         });
                 });
 
